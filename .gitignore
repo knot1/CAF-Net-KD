@@ -1,0 +1,25 @@
+# 忽略指定的两个文件夹（完整名称）
+Baseline_Potsdam_42/
+Baseline_Vaihingen_42/
+
+# 可选：补充深度学习项目常见的忽略项（推荐添加，避免提交无关文件）
+# Python编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE配置文件
+.idea/
+.vscode/
+
+# 数据/日志/模型文件
+data/
+figs/
+*.pth
+*.pt
+*.log
+
+# 系统临时文件
+*.swp
+*.swo
+.DS_Store
