@@ -1,0 +1,64 @@
+[2026-04-14 11:20:05,287][__main__][INFO] - Loaded configuration:
+[2026-04-14 11:20:05,288][__main__][INFO] - --- training configuration:
+[2026-04-14 11:20:05,289][__main__][INFO] - 
+epochs: 100
+save_epoch: 1
+batch_size: 10
+learning_rate: 0.0001
+weight_decay: 0.0005
+momentum: 0.9
+milestones:
+- 25
+- 35
+- 45
+window_size:
+- 256
+- 256
+num_workers: 0
+cache: true
+augmentation: true
+alpha: 0.01
+beta: 0.05
+gamma: 0.5
+distill:
+  enable: true
+  teacher_ckpt: /home/wsj/FDMF-Net/Baseline_Vaihingen_42-improved/2026-03-24_11-13-08温度系数1.0/results_Baseline_vaihingen/best_model_vaihingen
+  teacher_backbone: /home/wsj/RGBX_Semantic_Segmentation/pretrained/segformer/mit_b4.pth
+  T: 4.0
+  lambda_kd: 1.0
+  lambda_edge: 1.0
+  edge_k: 3
+  edge_boost: 1.0
+
+[2026-04-14 11:20:05,289][__main__][INFO] - --- model configuration:
+[2026-04-14 11:20:05,290][__main__][INFO] - 
+pretrained: true
+model_dim: 512
+num_heads: 8
+ffn_dim: 2048
+dropout: 0.5
+num_layers: 1
+backbone: mit_b0
+decoder_embed_dim: 512
+pretrained_backbone: /home/wsj/CAF-Net/pretrained/mit_b0.pth
+bn_eps: 0.01
+bn_momentum: 0.01
+
+[2026-04-14 11:20:05,290][__main__][INFO] - Using GPUs: 0 1
+[2026-04-14 11:20:05,290][__main__][INFO] - Using model: Baseline
+[2026-04-14 11:20:05,290][__main__][INFO] - Using dataset: Vaihingen
+[2026-04-14 11:20:05,291][__main__][INFO] - Real Training Configuration:
+[2026-04-14 11:20:05,291][__main__][INFO] - batch size: 10
+[2026-04-14 11:20:05,291][__main__][INFO] - learning rate: 0.000100
+[2026-04-14 11:20:05,578][py.warnings][WARNING] - /home/wsj/.conda/envs/FDMF-Net/lib/python3.9/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+
+[2026-04-14 11:20:06,040][py.warnings][WARNING] - /home/wsj/CAF-Net/models/encoder.py:482: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  raw_state_dict = torch.load(model_file, map_location=torch.device('cpu'))
+
+[2026-04-14 11:20:06,334][__main__][INFO] - All Params: 9350544
+[2026-04-14 11:20:06,335][__main__][INFO] - training : ['1', '3', '23', '26', '7', '11', '13', '28', '17', '32', '34', '37']
+[2026-04-14 11:20:06,336][__main__][INFO] - testing : ['5', '21', '15', '30']
+[2026-04-14 11:20:06,361][__main__][INFO] - Experiment output directory: /home/wsj/CAF-Net/Baseline_Vaihingen_42/2026-04-14_11-20-05
+[2026-04-14 11:20:06,361][__main__][INFO] - Start training...
+[2026-04-14 11:20:06,362][train][INFO] - Train (epoch 1/100)

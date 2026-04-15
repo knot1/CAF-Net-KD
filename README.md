@@ -22,5 +22,24 @@ To train **CAF-Net** on the ISPRS Vaihingen dataset, use the following command:
 bash train_Vaihingen.sh 0 
 ```
 
+<<<<<<< HEAD
 
 # CAF-Net-KD
+=======
+## 🎓 **Knowledge Distillation**
+
+CAF-Net supports optional knowledge distillation training: a pretrained teacher (e.g. MiT-B4 backbone) guides a lightweight student (e.g. MiT-B0) using pixel-wise logits KD and boundary-aware KD.
+
+Example command:
+
+```bash
+python main.py \
+  training_dataset=Potsdam \
+  model.backbone=mit_b0 \
+  training.distill.enable=true \
+  training.distill.teacher_ckpt=/path/to/best_model_potsdam \
+  training.distill.teacher_backbone=mit_b4
+```
+
+See [docs/distill.md](docs/distill.md) for full details and ablation guidance.
+>>>>>>> m0蒸馏
