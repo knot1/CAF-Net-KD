@@ -68,7 +68,7 @@ def confidence_weight_map(conf_map, threshold=0.0, low_weight=0.0, dtype=None):
 
     Args:
         conf_map: [B, H, W] float tensor in [0, 1]
-        threshold: confidence threshold for strong distillation
+        threshold: confidence threshold for strong distillation (<= 0 returns conf_map as-is)
         low_weight: weight used for low-confidence pixels
         dtype: optional dtype to cast the confidence map to
 
@@ -235,7 +235,7 @@ def train(dataset_cfg, training_cfg, model, optimizer, scheduler, train_loader, 
                 if use_uaf_conf and t_conf is None:
                     raise RuntimeError(
                         "UAF confidence requested but teacher did not return a confidence map. "
-                        "Ensure the teacher model supports return_conf=True and uses UAF fusion."
+                        "Ensure the teacher model supports return_conf=True and exposes uaf4 fusion."
                     )
                 conf_weight = confidence_weight_map(
                     t_conf, threshold=conf_threshold, low_weight=low_conf_weight, dtype=output.dtype

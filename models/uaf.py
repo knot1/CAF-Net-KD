@@ -34,7 +34,8 @@ class UncertaintyAwareFusion(nn.Module):
 
         fusion = w_rgb * rgb + w_dsm * dsm
         if return_conf:
-            # Equal weights (0.5/0.5) indicate maximum uncertainty; map max weight from [0.5, 1.0] -> [0, 1].
+            # Use max modality weight as confidence: higher max means stronger preference for one modality.
+            # Map max weight from [0.5, 1.0] -> [0, 1] so 0.5 (equal weights) becomes 0.0 confidence.
             conf = (weights.max(dim=1).values - 0.5) * 2.0  # 0.5 -> 0.0 (uncertain), 1.0 -> 1.0 (confident)
             conf = conf.clamp(0.0, 1.0)
             return fusion, conf
