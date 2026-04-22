@@ -63,13 +63,13 @@ def edge_weight_from_predmask(mask, k=3, edge_boost=1.0):
     return 1.0 + edge_boost * boundary
 
 
-def confidence_weight_map(conf_map, threshold=0.0, low_weight=0.0, dtype=None):
+def confidence_weight_map(conf_map, threshold=0.0, low_conf_weight=0.0, dtype=None):
     """Apply high/low confidence gating to a confidence map.
 
     Args:
         conf_map: [B, H, W] float tensor in [0, 1]
         threshold: confidence threshold for strong distillation (<= 0 returns conf_map as-is)
-        low_weight: weight used for low-confidence pixels
+        low_conf_weight: weight used for low-confidence pixels
         dtype: optional dtype to cast the confidence map to
 
     Returns:
@@ -83,7 +83,7 @@ def confidence_weight_map(conf_map, threshold=0.0, low_weight=0.0, dtype=None):
         return conf_map
     high_mask = (conf_map >= threshold).float()
     low_mask = 1.0 - high_mask
-    return conf_map * high_mask + low_weight * low_mask
+    return conf_map * high_mask + low_conf_weight * low_mask
 
 
 def test(dataset_cfg, training_cfg, model, test_ids, all=False, test_loader=None):
@@ -235,10 +235,10 @@ def train(dataset_cfg, training_cfg, model, optimizer, scheduler, train_loader, 
                 if use_uaf_conf and t_conf is None:
                     raise RuntimeError(
                         "UAF confidence requested but teacher did not return a confidence map. "
-                        "Ensure the teacher model supports return_conf=True and exposes uaf4 fusion."
+                        "Ensure the teacher model architecture includes UAF modules and was loaded correctly."
                     )
                 conf_weight = confidence_weight_map(
-                    t_conf, threshold=conf_threshold, low_weight=low_conf_weight, dtype=output.dtype
+                    t_conf, threshold=conf_threshold, low_conf_weight=low_conf_weight, dtype=output.dtype
                 )
                 loss_kd = pixel_kd_kl(output, t_out, T=T, weight=conf_weight)
 
