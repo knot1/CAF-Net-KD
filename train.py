@@ -76,12 +76,11 @@ def confidence_weight_map(conf_map, threshold=0.0, low_weight=0.0):
     """
     if conf_map is None:
         return None
-    weight = conf_map
-    if threshold > 0:
-        high_mask = (weight >= threshold).float()
-        low_mask = 1.0 - high_mask
-        weight = weight * high_mask + low_weight * low_mask
-    return weight
+    if threshold <= 0:
+        return conf_map
+    high_mask = (conf_map >= threshold).float()
+    low_mask = 1.0 - high_mask
+    return conf_map * high_mask + low_weight * low_mask
 
 
 def test(dataset_cfg, training_cfg, model, test_ids, all=False, test_loader=None):
@@ -231,7 +230,10 @@ def train(dataset_cfg, training_cfg, model, optimizer, scheduler, train_loader, 
 
                 # pixel-wise logits KD
                 if use_uaf_conf and t_conf is None:
-                    raise RuntimeError("UAF confidence requested but teacher did not return a confidence map.")
+                    raise RuntimeError(
+                        "UAF confidence requested but teacher did not return a confidence map. "
+                        "Ensure the teacher model supports return_conf=True and uses UAF fusion."
+                    )
                 conf_weight = confidence_weight_map(t_conf, threshold=conf_threshold, low_weight=low_conf_weight)
                 if conf_weight is not None:
                     conf_weight = conf_weight.to(output.dtype)

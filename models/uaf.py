@@ -34,7 +34,7 @@ class UncertaintyAwareFusion(nn.Module):
 
         fusion = w_rgb * rgb + w_dsm * dsm
         if return_conf:
-            # Softmax max is in [0.5, 1.0] for two modalities; rescale to [0, 1] confidence.
+            # Equal weights (0.5/0.5) indicate maximum uncertainty; rescale max weight to [0, 1] confidence.
             conf = (weights.max(dim=1).values - 0.5) * 2.0
             conf = conf.clamp(0.0, 1.0)
             return fusion, conf
