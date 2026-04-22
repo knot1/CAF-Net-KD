@@ -63,19 +63,22 @@ def edge_weight_from_predmask(mask, k=3, edge_boost=1.0):
     return 1.0 + edge_boost * boundary
 
 
-def confidence_weight_map(conf_map, threshold=0.0, low_weight=0.0):
+def confidence_weight_map(conf_map, threshold=0.0, low_weight=0.0, dtype=None):
     """Apply high/low confidence gating to a confidence map.
 
     Args:
         conf_map: [B, H, W] float tensor in [0, 1]
         threshold: confidence threshold for strong distillation
         low_weight: weight used for low-confidence pixels
+        dtype: optional dtype to cast the confidence map to
 
     Returns:
         [B, H, W] weight map or None if conf_map is None.
     """
     if conf_map is None:
         return None
+    if dtype is not None:
+        conf_map = conf_map.to(dtype)
     if threshold <= 0:
         return conf_map
     high_mask = (conf_map >= threshold).float()
@@ -234,9 +237,9 @@ def train(dataset_cfg, training_cfg, model, optimizer, scheduler, train_loader, 
                         "UAF confidence requested but teacher did not return a confidence map. "
                         "Ensure the teacher model supports return_conf=True and uses UAF fusion."
                     )
-                conf_weight = confidence_weight_map(t_conf, threshold=conf_threshold, low_weight=low_conf_weight)
-                if conf_weight is not None:
-                    conf_weight = conf_weight.to(output.dtype)
+                conf_weight = confidence_weight_map(
+                    t_conf, threshold=conf_threshold, low_weight=low_conf_weight, dtype=output.dtype
+                )
                 loss_kd = pixel_kd_kl(output, t_out, T=T, weight=conf_weight)
 
                 # boundary-aware KD: emphasise pixels near class boundaries
