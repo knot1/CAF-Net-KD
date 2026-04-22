@@ -1,11 +1,11 @@
 # configs/config.yaml
 cuda_visible_devices: [0,1]
 training_model: "Baseline"
-# training_dataset: "Vaihingen"
-training_dataset: "Potsdam"
+training_dataset: "Vaihingen"
+# training_dataset: "Potsdam"
 seed: 42
-# folder: "/data3/wsjdataset/Vaihingen_unzip/ISPRS_semantic_labeling_Vaihingen.zip/"  # your dataset path
-folder: "/data3/wsjdataset/OpenDataLab_Potsdam/raw"  # your dataset path
+folder: "/data3/wsjdataset/Vaihingen_unzip/ISPRS_semantic_labeling_Vaihingen.zip/"  # your dataset path
+# folder: "/data3/wsjdataset/OpenDataLab_Potsdam/raw"  # your dataset path
 hydra:
   run:
     dir: "./${training_model}_${training_dataset}_${seed}/${now:%Y-%m-%d_%H-%M-%S}"
@@ -21,9 +21,9 @@ model:
   ffn_dim: 2048
   dropout: 0.5
   num_layers: 1
-  backbone: "mit_b4"
+  backbone: "mit_b3"
   decoder_embed_dim: 512
-  pretrained_backbone: "/home/wsj/RGBX_Semantic_Segmentation/pretrained/segformer/mit_b4.pth"
+  pretrained_backbone: "/home/wsj/CAF-Net-KD/pretrained/mit_b3.pth"
   bn_eps: 0.01
   bn_momentum: 0.01
 
@@ -42,6 +42,15 @@ training:
   alpha: 0.01
   beta: 0.05
   gamma: 0.5
+  distill:
+    enable: false
+    teacher_ckpt: ""
+    teacher_backbone: "mit_b4"
+    T: 4.0
+    lambda_kd: 1.0
+    lambda_edge: 1.0
+    edge_k: 3
+    edge_boost: 1.0
 
 dataset:
   name: ${training_dataset}

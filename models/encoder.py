@@ -530,35 +530,35 @@ def _adapt_first_conv(weight, in_chans: int):
 
 
 class mit_b0(RGBXTransformer):
-    def __init__(self, fuse_cfg=None, **kwargs):
+    def __init__(self, in_chans, fuse_cfg=None, **kwargs):
         super(mit_b0, self).__init__(
             patch_size=4, embed_dims=[32, 64, 160, 256], num_heads=[1, 2, 5, 8], mlp_ratios=[4, 4, 4, 4],
             qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[2, 2, 2, 2], sr_ratios=[8, 4, 2, 1],
-            drop_rate=0.0, drop_path_rate=0.1, in_chans=None)
+            drop_rate=0.0, drop_path_rate=0.1, in_chans=in_chans)
 
 
 class mit_b1(RGBXTransformer):
-    def __init__(self, fuse_cfg=None, **kwargs):
+    def __init__(self, in_chans, fuse_cfg=None, **kwargs):
         super(mit_b1, self).__init__(
             patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[4, 4, 4, 4],
             qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[2, 2, 2, 2], sr_ratios=[8, 4, 2, 1],
-            drop_rate=0.0, drop_path_rate=0.1, in_chans=None)
+            drop_rate=0.0, drop_path_rate=0.1, in_chans=in_chans)
 
 
 class mit_b2(RGBXTransformer):
-    def __init__(self, fuse_cfg=None, **kwargs):
+    def __init__(self, in_chans, fuse_cfg=None, **kwargs):
         super(mit_b2, self).__init__(
             patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[4, 4, 4, 4],
             qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 4, 6, 3], sr_ratios=[8, 4, 2, 1],
-            drop_rate=0.0, drop_path_rate=0.1, in_chans=None)
+            drop_rate=0.0, drop_path_rate=0.1, in_chans=in_chans)
 
 
 class mit_b3(RGBXTransformer):
-    def __init__(self, fuse_cfg=None, **kwargs):
+    def __init__(self, in_chans, fuse_cfg=None, **kwargs):
         super(mit_b3, self).__init__(
             patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[4, 4, 4, 4],
             qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 4, 18, 3], sr_ratios=[8, 4, 2, 1],
-            drop_rate=0.0, drop_path_rate=0.1, in_chans=None)
+            drop_rate=0.0, drop_path_rate=0.1, in_chans=in_chans)
 
 
 class mit_b4(RGBXTransformer):
@@ -570,8 +570,8 @@ class mit_b4(RGBXTransformer):
 
 
 class mit_b5(RGBXTransformer):
-    def __init__(self, fuse_cfg=None, **kwargs):
+    def __init__(self, in_chans, fuse_cfg=None, **kwargs):
         super(mit_b5, self).__init__(
             patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[4, 4, 4, 4],
             qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 6, 40, 3], sr_ratios=[8, 4, 2, 1],
-            drop_rate=0.0, drop_path_rate=0.1, in_chans=None)
+            drop_rate=0.0, drop_path_rate=0.1, in_chans=in_chans)

@@ -1,0 +1,7 @@
+- cuda_visible_devices=[1]
+- training_dataset=Vaihingen
+- seed=42
+- training.learning_rate=0.0001
+- training.alpha=0.01
+- training.beta=0.05
+- training.gamma=0.5

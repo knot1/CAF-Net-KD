@@ -47,16 +47,43 @@ def main(cfg: DictConfig):
     test_ids = dataset_cfg.test_ids
 
     model_cfg = cfg.model
+    in_chans = [3, 1]  # default; overridden per dataset below
     if cfg.training_dataset == 'Potsdam':
-        model = Baseline(cfg=model_cfg, num_classes=N_CLASSES, in_chans=[4, 1])
+        in_chans = [4, 1]
+        model = Baseline(cfg=model_cfg, num_classes=N_CLASSES, in_chans=in_chans)
     elif cfg.training_dataset == 'Vaihingen':
-        model = Baseline(cfg=model_cfg, num_classes=N_CLASSES, in_chans=[3, 1])
+        in_chans = [3, 1]
+        model = Baseline(cfg=model_cfg, num_classes=N_CLASSES, in_chans=in_chans)
 
     model = model.cuda()
     model = nn.DataParallel(model)
 
     total_params = sum(param.nelement() for param in model.parameters())
     logger.info('All Params: %d', total_params)
+
+    # ---- optional teacher for knowledge distillation ----
+    teacher_model = None
+    kd_cfg = cfg.training.get("distill", None)
+    if kd_cfg is not None and kd_cfg.enable:
+        teacher_cfg = OmegaConf.to_container(model_cfg, resolve=True)
+        teacher_cfg = OmegaConf.create(teacher_cfg)
+        teacher_backbone = kd_cfg.get("teacher_backbone", "mit_b4")
+        OmegaConf.update(teacher_cfg, "backbone", teacher_backbone)
+
+        teacher_model = Baseline(cfg=teacher_cfg, num_classes=N_CLASSES, in_chans=in_chans)
+        teacher_ckpt = kd_cfg.teacher_ckpt
+        if not teacher_ckpt:
+            raise ValueError("training.distill.teacher_ckpt must be set when distillation is enabled.")
+        state_dict = torch.load(teacher_ckpt, map_location="cpu")
+        teacher_model.load_state_dict(state_dict, strict=False)
+        logger.info("Loaded teacher checkpoint from: %s", teacher_ckpt)
+        teacher_model = teacher_model.cuda()
+        teacher_model = nn.DataParallel(teacher_model)
+        teacher_model.eval()
+        for p in teacher_model.parameters():
+            p.requires_grad_(False)
+        teacher_params = sum(p.nelement() for p in teacher_model.parameters())
+        logger.info("Teacher backbone: %s  |  Teacher Params: %d", teacher_backbone, teacher_params)
 
     logger.info("training : %s", train_ids)
     logger.info("testing : %s", test_ids)
@@ -130,9 +157,10 @@ def main(cfg: DictConfig):
     logger.info('Start training...')
     if cfg.training_dataset == 'WHU' or cfg.training_dataset == 'YESeg':
         train(dataset_cfg, cfg.training, model, optimizer, scheduler, train_loader, WEIGHTS, results_dir,
-              test_loader=test_loader)
+              test_loader=test_loader, teacher_model=teacher_model, kd_cfg=kd_cfg)
     else:
-        train(dataset_cfg, cfg.training, model, optimizer, scheduler, train_loader, WEIGHTS, results_dir)
+        train(dataset_cfg, cfg.training, model, optimizer, scheduler, train_loader, WEIGHTS, results_dir,
+              teacher_model=teacher_model, kd_cfg=kd_cfg)
     end_train = time.time()
     logger.info('Training time: {:.2f} hours'.format((end_train - start_train) / 3600))
     logger.info("")

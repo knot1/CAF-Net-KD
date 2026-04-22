@@ -1,5 +1,5 @@
 cuda_visible_devices:
-- 0
+- 1
 training_model: Baseline
 training_dataset: Vaihingen
 seed: 42
@@ -11,9 +11,9 @@ model:
   ffn_dim: 2048
   dropout: 0.5
   num_layers: 1
-  backbone: mit_b0
+  backbone: mit_b3
   decoder_embed_dim: 512
-  pretrained_backbone: /home/wsj/CAF-Net/pretrained/mit_b0.pth
+  pretrained_backbone: /home/wsj/CAF-Net-KD/pretrained/mit_b3.pth
   bn_eps: 0.01
   bn_momentum: 0.01
 training:
@@ -38,8 +38,8 @@ training:
   gamma: 0.5
   distill:
     enable: false
-    teacher_ckpt: /home/wsj/FDMF-Net/Baseline_Vaihingen_42-improved/2026-03-24_11-13-08温度系数1.0/results_Baseline_vaihingen/best_model_vaihingen
-    teacher_backbone: /home/wsj/RGBX_Semantic_Segmentation/pretrained/segformer/mit_b4.pth
+    teacher_ckpt: ''
+    teacher_backbone: mit_b4
     T: 4.0
     lambda_kd: 1.0
     lambda_edge: 1.0

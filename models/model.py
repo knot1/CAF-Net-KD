@@ -98,7 +98,7 @@ class Baseline(nn.Module):
             from .encoder import mit_b2 as backbone
             self.backbone = backbone(norm_fuse=norm_layer, in_chans=self.in_chans)
         elif cfg.backbone == 'mit_b1':
-            from .encoder import mit_b0 as backbone
+            from .encoder import mit_b1 as backbone
             self.backbone = backbone(norm_fuse=norm_layer, in_chans=self.in_chans)
         elif cfg.backbone == 'mit_b0':
             from .encoder import mit_b0 as backbone
