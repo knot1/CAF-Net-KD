@@ -38,10 +38,11 @@ def _load_model_state(model, checkpoint_path):
 
     load_result = model.load_state_dict(checkpoint, strict=False)
     if getattr(load_result, 'missing_keys', None):
-        logger.warning("Missing keys when loading checkpoint %s: %d", checkpoint_path, len(load_result.missing_keys))
+        logger.warning("Missing keys when loading checkpoint %s: %d | sample: %s", checkpoint_path,
+                       len(load_result.missing_keys), load_result.missing_keys[:20])
     if getattr(load_result, 'unexpected_keys', None):
-        logger.warning("Unexpected keys when loading checkpoint %s: %d", checkpoint_path,
-                       len(load_result.unexpected_keys))
+        logger.warning("Unexpected keys when loading checkpoint %s: %d | sample: %s", checkpoint_path,
+                       len(load_result.unexpected_keys), load_result.unexpected_keys[:20])
 
 
 @hydra.main(config_path=".", config_name="config", version_base=None)
@@ -83,7 +84,7 @@ def main(cfg: DictConfig):
     model = nn.DataParallel(model)
 
     robust_kd_cfg = cfg.training.get('robust_kd', None)
-    robust_kd_enabled = bool(robust_kd_cfg.enabled) if robust_kd_cfg is not None else False
+    robust_kd_enabled = bool(robust_kd_cfg.get('enabled', False)) if robust_kd_cfg is not None else False
     teacher_model = None
     if robust_kd_enabled:
         logger.info("Robust KD enabled")
