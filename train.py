@@ -32,8 +32,17 @@ def _kl_divergence_logits(student_logits, teacher_logits, temperature=1.0):
 
 
 def _degrade_input_batch(rgb, dsm, robust_kd_cfg):
-    modes = _get_cfg_value(robust_kd_cfg, 'modes', ['rgb_noise', 'rgb_missing', 'dsm_missing', 'dsm_hole', 'resolution_down'])
-    mode = random.choice(list(modes))
+    default_modes = ['rgb_noise', 'rgb_missing', 'dsm_missing', 'dsm_hole', 'resolution_down']
+    modes = _get_cfg_value(robust_kd_cfg, 'modes', default_modes)
+    if isinstance(modes, str):
+        modes = [m.strip() for m in modes.split(',') if m.strip()]
+    elif isinstance(modes, (tuple, list)):
+        modes = [m for m in modes if isinstance(m, str) and m]
+    else:
+        modes = default_modes
+    if len(modes) == 0:
+        modes = default_modes
+    mode = random.choice(modes)
 
     rgb_degraded = rgb.clone()
     dsm_degraded = dsm.clone()
@@ -178,7 +187,8 @@ def train(dataset_cfg, training_cfg, model, optimizer, scheduler, train_loader, 
     ema_momentum = float(_get_cfg_value(robust_kd_cfg, 'ema_momentum', 0.999))
 
     if robust_kd_enabled and teacher_model is None:
-        logger.warning('robust_kd.enabled=True but teacher model is None; falling back to no-grad clean forward of student.')
+        logger.warning('robust_kd.enabled=True but teacher model is None; using no-grad clean student logits as teacher target. '
+                       'Set training.robust_kd.teacher_checkpoint to provide a stronger teacher.')
     if robust_kd_enabled and teacher_model is not None:
         teacher_model.eval()
 

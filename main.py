@@ -36,7 +36,12 @@ def _load_model_state(model, checkpoint_path):
         elif not ckpt_has_module and model_has_module:
             checkpoint = OrderedDict((f'module.{k}', v) for k, v in checkpoint.items())
 
-    model.load_state_dict(checkpoint, strict=False)
+    load_result = model.load_state_dict(checkpoint, strict=False)
+    if getattr(load_result, 'missing_keys', None):
+        logger.warning("Missing keys when loading checkpoint %s: %d", checkpoint_path, len(load_result.missing_keys))
+    if getattr(load_result, 'unexpected_keys', None):
+        logger.warning("Unexpected keys when loading checkpoint %s: %d", checkpoint_path,
+                       len(load_result.unexpected_keys))
 
 
 @hydra.main(config_path=".", config_name="config", version_base=None)
