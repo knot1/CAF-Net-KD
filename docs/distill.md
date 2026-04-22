@@ -12,12 +12,15 @@ The distillation setup adds two extra loss terms on top of the standard segmenta
 |-----------|---------|---------|
 | Pixel-wise logits KD | `KL(softmax(s/T) ‖ softmax(t/T)) × T²` | Transfer class probability distributions at every pixel |
 | Boundary-aware KD | Same KL, weighted by teacher boundary map | Recover fine boundary details that lightweight backbones tend to lose |
+| Uncertainty-guided KD | `conf_UAF × KL(softmax(s/T) ‖ softmax(t/T)) × T²` | Emphasize distillation where the teacher is confident |
 
 Total loss:
 
 ```
 L = L_seg  +  λ_kd × L_kd  +  λ_edge × L_edgeKD
 ```
+
+`conf_UAF` is derived from the teacher's UAF fusion weights (high confidence → stronger KD, low confidence → weaker KD). Low-confidence regions naturally fall back to the supervised segmentation losses.
 
 ---
 
@@ -36,6 +39,9 @@ training:
     lambda_edge: 1.0              # weight for boundary-aware KD loss
     edge_k: 3                     # morphological kernel size for boundary detection
     edge_boost: 1.0               # additional weight at boundary pixels (base = 1)
+    use_uaf_conf: true            # enable uncertainty-guided distillation
+    conf_threshold: 0.0           # threshold for high-confidence pixels (0 disables gating)
+    low_conf_weight: 0.0          # KD weight for low-confidence pixels
 ```
 
 The student backbone is selected via `model.backbone` (default `mit_b4`; use `mit_b0` for the lightest student).

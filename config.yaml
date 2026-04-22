@@ -51,6 +51,9 @@ training:
     lambda_edge: 1.0
     edge_k: 3
     edge_boost: 1.0
+    use_uaf_conf: true
+    conf_threshold: 0.0
+    low_conf_weight: 0.0
 
 dataset:
   name: ${training_dataset}

@@ -122,18 +122,36 @@ class Baseline(nn.Module):
                     self.norm_layer, cfg.bn_eps, cfg.bn_momentum,
                     mode='fan_in', nonlinearity='relu')
 
-    def encode_decode(self, rgb, modal_x):
+    def encode_decode(self, rgb, modal_x, return_conf: bool = False):
         ori_size = rgb.shape
-        x_semantic, L_cons, low_L_cons = self.backbone(rgb, modal_x)
+        if return_conf:
+            x_semantic, L_cons, low_L_cons, uaf_conf = self.backbone(rgb, modal_x, return_conf=True)
+        else:
+            x_semantic, L_cons, low_L_cons = self.backbone(rgb, modal_x)
+            uaf_conf = None
 
         out_semantic = self.decode_head.forward(x_semantic)
         out_semantic = F.interpolate(out_semantic, size=ori_size[2:], mode='bilinear', align_corners=False)
 
+        if return_conf and uaf_conf is not None:
+            uaf_conf = F.interpolate(
+                uaf_conf.unsqueeze(1),
+                size=ori_size[2:],
+                mode='bilinear',
+                align_corners=False,
+            ).squeeze(1)
+        if return_conf:
+            return out_semantic, L_cons, low_L_cons, uaf_conf
         return out_semantic, L_cons, low_L_cons
 
-    def forward(self, rgb, modal_x):
+    def forward(self, rgb, modal_x, return_conf: bool = False):
         if modal_x.ndim == 3:
             modal_x = torch.unsqueeze(modal_x, dim=1)
-        outputs, L_cons, low_L_cons = self.encode_decode(rgb, modal_x)
+        if return_conf:
+            outputs, L_cons, low_L_cons, uaf_conf = self.encode_decode(rgb, modal_x, return_conf=True)
+        else:
+            outputs, L_cons, low_L_cons = self.encode_decode(rgb, modal_x)
 
+        if return_conf:
+            return outputs, L_cons, low_L_cons, uaf_conf
         return outputs, L_cons, low_L_cons

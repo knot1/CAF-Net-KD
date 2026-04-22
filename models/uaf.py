@@ -22,7 +22,7 @@ class UncertaintyAwareFusion(nn.Module):
         self.rgb_conf = conf_head()
         self.dsm_conf = conf_head()
 
-    def forward(self, rgb: torch.Tensor, dsm: torch.Tensor) -> torch.Tensor:
+    def forward(self, rgb: torch.Tensor, dsm: torch.Tensor, return_conf: bool = False):
         rgb_score = self.rgb_conf(rgb)  # [B,1,H,W]
         dsm_score = self.dsm_conf(dsm)  # [B,1,H,W]
 
@@ -33,4 +33,8 @@ class UncertaintyAwareFusion(nn.Module):
         w_dsm = weights[:, 1:2, :, :]
 
         fusion = w_rgb * rgb + w_dsm * dsm
+        if return_conf:
+            conf = (weights.max(dim=1).values - 0.5) * 2.0
+            conf = conf.clamp(0.0, 1.0)
+            return fusion, conf
         return fusion

@@ -63,6 +63,27 @@ def edge_weight_from_predmask(mask, k=3, edge_boost=1.0):
     return 1.0 + edge_boost * boundary
 
 
+def confidence_weight_map(conf_map, threshold=0.0, low_weight=0.0):
+    """Apply high/low confidence gating to a confidence map.
+
+    Args:
+        conf_map: [B, H, W] float tensor in [0, 1]
+        threshold: confidence threshold for strong distillation
+        low_weight: weight used for low-confidence pixels
+
+    Returns:
+        [B, H, W] weight map or None if conf_map is None.
+    """
+    if conf_map is None:
+        return None
+    weight = conf_map
+    if threshold > 0:
+        high_mask = (weight >= threshold).float()
+        low_mask = 1.0 - high_mask
+        weight = weight * high_mask + low_weight * low_mask
+    return weight
+
+
 def test(dataset_cfg, training_cfg, model, test_ids, all=False, test_loader=None):
     if dataset_cfg.name == 'Potsdam' or dataset_cfg.name == 'Vaihingen':
         stride = dataset_cfg.stride_size
@@ -196,18 +217,33 @@ def train(dataset_cfg, training_cfg, model, optimizer, scheduler, train_loader, 
                 lambda_edge = float(kd_cfg.lambda_edge)
                 edge_k = int(kd_cfg.edge_k)
                 edge_boost = float(kd_cfg.edge_boost)
+                use_uaf_conf = bool(getattr(kd_cfg, "use_uaf_conf", False))
+                conf_threshold = float(getattr(kd_cfg, "conf_threshold", 0.0))
+                low_conf_weight = float(getattr(kd_cfg, "low_conf_weight", 0.0))
 
                 teacher_model.eval()
                 with torch.no_grad():
-                    t_out, _, _ = teacher_model(opt, dsm)
+                    if use_uaf_conf:
+                        t_out, _, _, t_conf = teacher_model(opt, dsm, return_conf=True)
+                    else:
+                        t_out, _, _ = teacher_model(opt, dsm)
+                        t_conf = None
 
                 # pixel-wise logits KD
-                loss_kd = pixel_kd_kl(output, t_out, T=T)
+                if use_uaf_conf and t_conf is None:
+                    t_conf = torch.softmax(t_out, dim=1).max(dim=1).values
+                conf_weight = confidence_weight_map(t_conf, threshold=conf_threshold, low_weight=low_conf_weight)
+                if conf_weight is not None:
+                    conf_weight = conf_weight.to(output.dtype)
+                loss_kd = pixel_kd_kl(output, t_out, T=T, weight=conf_weight)
 
                 # boundary-aware KD: emphasise pixels near class boundaries
                 t_mask = torch.argmax(t_out, dim=1)  # [B, H, W]
                 w_edge = edge_weight_from_predmask(t_mask, k=edge_k, edge_boost=edge_boost)
-                loss_edgekd = pixel_kd_kl(output, t_out, T=T, weight=w_edge)
+                edge_weight = w_edge
+                if conf_weight is not None:
+                    edge_weight = edge_weight * conf_weight
+                loss_edgekd = pixel_kd_kl(output, t_out, T=T, weight=edge_weight)
 
                 loss = loss + lambda_kd * loss_kd + lambda_edge * loss_edgekd
 

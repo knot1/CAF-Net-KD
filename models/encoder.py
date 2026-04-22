@@ -388,9 +388,10 @@ class RGBXTransformer(nn.Module):
         else:
             raise TypeError('pretrained must be a str or None')
 
-    def forward_features(self, x_rgb, x_e):
+    def forward_features(self, x_rgb, x_e, return_conf: bool = False):
         B = x_rgb.shape[0]
         outs_semantic = []
+        uaf_conf = None
 
         # Stage 1
         x_rgb, H, W = self.patch_embed1(x_rgb)
@@ -455,7 +456,11 @@ class RGBXTransformer(nn.Module):
 
         x_rgb = self.acfm4(x_rgb, x_e)  # inject DSM freq info into RGB (stage4 only)
         
-        outs_semantic.append(self.uaf4(x_rgb, x_e))
+        if return_conf:
+            uaf4_out, uaf_conf = self.uaf4(x_rgb, x_e, return_conf=True)
+        else:
+            uaf4_out = self.uaf4(x_rgb, x_e)
+        outs_semantic.append(uaf4_out)
    
         last = outs_semantic[-1]
         if isinstance(last, (tuple, list)):
@@ -464,15 +469,24 @@ class RGBXTransformer(nn.Module):
 
         L_cons = last.new_zeros(1)
         low_L_cons = last.new_zeros(1)
+        if return_conf:
+            return outs_semantic, L_cons, low_L_cons, uaf_conf
         return outs_semantic, L_cons, low_L_cons
 
-    def forward(self, x_rgb, x_e):
-        out_semantic, L_cons, low_L_cons = self.forward_features(x_rgb, x_e)
+    def forward(self, x_rgb, x_e, return_conf: bool = False):
+        if return_conf:
+            out_semantic, L_cons, low_L_cons, uaf_conf = self.forward_features(
+                x_rgb, x_e, return_conf=True
+            )
+        else:
+            out_semantic, L_cons, low_L_cons = self.forward_features(x_rgb, x_e)
         last = out_semantic[-1]
         if isinstance(last, (tuple, list)):
             last = last[0]
 
         L_cons, low_L_cons = self.fusion_loss(last, last)  
+        if return_conf:
+            return out_semantic, L_cons, low_L_cons, uaf_conf
         return out_semantic, L_cons, low_L_cons
 
 
