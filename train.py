@@ -231,7 +231,7 @@ def train(dataset_cfg, training_cfg, model, optimizer, scheduler, train_loader, 
 
                 # pixel-wise logits KD
                 if use_uaf_conf and t_conf is None:
-                    t_conf = torch.softmax(t_out, dim=1).max(dim=1).values
+                    raise RuntimeError("UAF confidence requested but teacher did not return a confidence map.")
                 conf_weight = confidence_weight_map(t_conf, threshold=conf_threshold, low_weight=low_conf_weight)
                 if conf_weight is not None:
                     conf_weight = conf_weight.to(output.dtype)
