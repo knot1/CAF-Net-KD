@@ -2,6 +2,7 @@ import logging
 import math
 import os
 import time
+from collections import OrderedDict
 
 import hydra
 import torch
@@ -15,6 +16,27 @@ from utils import ISPRS_dataset, convert_to_color, fix_random_seed
 
 logging.captureWarnings(True)
 logger = logging.getLogger(__name__)
+
+
+def _load_model_state(model, checkpoint_path):
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    if isinstance(checkpoint, dict):
+        if 'state_dict' in checkpoint:
+            checkpoint = checkpoint['state_dict']
+        elif 'model' in checkpoint:
+            checkpoint = checkpoint['model']
+
+    model_state_keys = list(model.state_dict().keys())
+    ckpt_keys = list(checkpoint.keys()) if isinstance(checkpoint, dict) else []
+    if ckpt_keys and model_state_keys:
+        ckpt_has_module = ckpt_keys[0].startswith('module.')
+        model_has_module = model_state_keys[0].startswith('module.')
+        if ckpt_has_module and not model_has_module:
+            checkpoint = OrderedDict((k.replace('module.', '', 1), v) for k, v in checkpoint.items())
+        elif not ckpt_has_module and model_has_module:
+            checkpoint = OrderedDict((f'module.{k}', v) for k, v in checkpoint.items())
+
+    model.load_state_dict(checkpoint, strict=False)
 
 
 @hydra.main(config_path=".", config_name="config", version_base=None)
@@ -54,6 +76,30 @@ def main(cfg: DictConfig):
 
     model = model.cuda()
     model = nn.DataParallel(model)
+
+    robust_kd_cfg = cfg.training.get('robust_kd', None)
+    robust_kd_enabled = bool(robust_kd_cfg.enabled) if robust_kd_cfg is not None else False
+    teacher_model = None
+    if robust_kd_enabled:
+        logger.info("Robust KD enabled")
+        if cfg.training_dataset == 'Potsdam':
+            teacher_model = Baseline(cfg=model_cfg, num_classes=N_CLASSES, in_chans=[4, 1])
+        elif cfg.training_dataset == 'Vaihingen':
+            teacher_model = Baseline(cfg=model_cfg, num_classes=N_CLASSES, in_chans=[3, 1])
+        else:
+            teacher_model = Baseline(cfg=model_cfg, num_classes=N_CLASSES, in_chans=[3, 1])
+        teacher_model = teacher_model.cuda()
+        teacher_model = nn.DataParallel(teacher_model)
+
+        if robust_kd_cfg.get('teacher_checkpoint', ''):
+            _load_model_state(teacher_model, robust_kd_cfg.teacher_checkpoint)
+            logger.info("Loaded teacher checkpoint from %s", robust_kd_cfg.teacher_checkpoint)
+        else:
+            teacher_model.load_state_dict(model.state_dict(), strict=True)
+            logger.info("Initialized teacher from current student weights")
+        for param in teacher_model.parameters():
+            param.requires_grad = False
+        teacher_model.eval()
 
     total_params = sum(param.nelement() for param in model.parameters())
     logger.info('All Params: %d', total_params)
@@ -130,9 +176,10 @@ def main(cfg: DictConfig):
     logger.info('Start training...')
     if cfg.training_dataset == 'WHU' or cfg.training_dataset == 'YESeg':
         train(dataset_cfg, cfg.training, model, optimizer, scheduler, train_loader, WEIGHTS, results_dir,
-              test_loader=test_loader)
+              test_loader=test_loader, teacher_model=teacher_model)
     else:
-        train(dataset_cfg, cfg.training, model, optimizer, scheduler, train_loader, WEIGHTS, results_dir)
+        train(dataset_cfg, cfg.training, model, optimizer, scheduler, train_loader, WEIGHTS, results_dir,
+              teacher_model=teacher_model)
     end_train = time.time()
     logger.info('Training time: {:.2f} hours'.format((end_train - start_train) / 3600))
     logger.info("")

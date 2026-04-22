@@ -1,9 +1,11 @@
 import logging
 import os
+import random
 
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from skimage import io
 
 from utils import format_string, convert_from_color, count_sliding_window, grouper, sliding_window, CrossEntropy2d, dice_loss, \
@@ -13,6 +15,64 @@ from utils import format_string, convert_from_color, count_sliding_window, group
 
 logging.captureWarnings(True)
 logger = logging.getLogger(__name__)
+
+
+def _get_cfg_value(cfg, key, default):
+    if cfg is None:
+        return default
+    if isinstance(cfg, dict):
+        return cfg.get(key, default)
+    return getattr(cfg, key, default)
+
+
+def _kl_divergence_logits(student_logits, teacher_logits, temperature=1.0):
+    student_log_prob = F.log_softmax(student_logits / temperature, dim=1)
+    teacher_prob = F.softmax(teacher_logits / temperature, dim=1)
+    return F.kl_div(student_log_prob, teacher_prob, reduction='batchmean') * (temperature ** 2)
+
+
+def _degrade_input_batch(rgb, dsm, robust_kd_cfg):
+    modes = _get_cfg_value(robust_kd_cfg, 'modes', ['rgb_noise', 'rgb_missing', 'dsm_missing', 'dsm_hole', 'resolution_down'])
+    mode = random.choice(list(modes))
+
+    rgb_degraded = rgb.clone()
+    dsm_degraded = dsm.clone()
+
+    if mode == 'rgb_noise':
+        noise_std = float(_get_cfg_value(robust_kd_cfg, 'noise_std', 0.1))
+        rgb_degraded = rgb_degraded + torch.randn_like(rgb_degraded) * noise_std
+        rgb_degraded = torch.clamp(rgb_degraded, 0.0, 1.0)
+
+    elif mode == 'rgb_missing':
+        rgb_degraded = torch.zeros_like(rgb_degraded)
+
+    elif mode == 'dsm_missing':
+        dsm_degraded = torch.zeros_like(dsm_degraded)
+
+    elif mode == 'dsm_hole':
+        dsm_hole_ratio = float(_get_cfg_value(robust_kd_cfg, 'dsm_hole_ratio', 0.1))
+        dsm_hole_ratio = min(max(dsm_hole_ratio, 0.0), 1.0)
+        hole_mask = torch.rand_like(dsm_degraded) < dsm_hole_ratio
+        dsm_degraded[hole_mask] = 0.0
+
+    elif mode == 'resolution_down':
+        resolution_scale = float(_get_cfg_value(robust_kd_cfg, 'resolution_scale', 0.5))
+        resolution_scale = min(max(resolution_scale, 0.1), 1.0)
+        h, w = rgb_degraded.shape[-2:]
+        down_h = max(1, int(h * resolution_scale))
+        down_w = max(1, int(w * resolution_scale))
+        rgb_degraded = F.interpolate(rgb_degraded, size=(down_h, down_w), mode='bilinear', align_corners=False)
+        rgb_degraded = F.interpolate(rgb_degraded, size=(h, w), mode='bilinear', align_corners=False)
+
+    return rgb_degraded, dsm_degraded, mode
+
+
+@torch.no_grad()
+def _update_ema_teacher(student_model, teacher_model, momentum):
+    for teacher_param, student_param in zip(teacher_model.parameters(), student_model.parameters()):
+        teacher_param.data.mul_(momentum).add_(student_param.data, alpha=(1.0 - momentum))
+    for teacher_buffer, student_buffer in zip(teacher_model.buffers(), student_model.buffers()):
+        teacher_buffer.data.copy_(student_buffer.data)
 
 
 def test(dataset_cfg, training_cfg, model, test_ids, all=False, test_loader=None):
@@ -103,10 +163,24 @@ def test(dataset_cfg, training_cfg, model, test_ids, all=False, test_loader=None
             return results
 
 
-def train(dataset_cfg, training_cfg, model, optimizer, scheduler, train_loader, weights, results_dir, test_loader=None):
+def train(dataset_cfg, training_cfg, model, optimizer, scheduler, train_loader, weights, results_dir, test_loader=None,
+          teacher_model=None):
     weights = weights.cuda()
     epochs = training_cfg.epochs
     save_epoch = training_cfg.save_epoch
+    robust_kd_cfg = _get_cfg_value(training_cfg, 'robust_kd', None)
+    robust_kd_enabled = bool(_get_cfg_value(robust_kd_cfg, 'enabled', False))
+    kd_weight = float(_get_cfg_value(robust_kd_cfg, 'kd_weight', 1.0))
+    consistency_weight = float(_get_cfg_value(robust_kd_cfg, 'consistency_weight', 0.0))
+    kd_temperature = float(_get_cfg_value(robust_kd_cfg, 'temperature', 1.0))
+    consistency_temperature = float(_get_cfg_value(robust_kd_cfg, 'consistency_temperature', 1.0))
+    teacher_use_ema = bool(_get_cfg_value(robust_kd_cfg, 'teacher_use_ema', False))
+    ema_momentum = float(_get_cfg_value(robust_kd_cfg, 'ema_momentum', 0.999))
+
+    if robust_kd_enabled and teacher_model is None:
+        logger.warning('robust_kd.enabled=True but teacher model is None; falling back to no-grad clean forward of student.')
+    if robust_kd_enabled and teacher_model is not None:
+        teacher_model.eval()
 
     history = {
         'round': [],
@@ -134,13 +208,37 @@ def train(dataset_cfg, training_cfg, model, optimizer, scheduler, train_loader, 
             opt, dsm, target = opt.cuda(), dsm.cuda(), target.cuda()
             optimizer.zero_grad()
 
-            output, L_cons, low_L_cons = model(opt, dsm)
-            loss_ce = CrossEntropy2d(output, target, weight=weights)
-            loss_dice = dice_loss(output, target)
-            
-            loss = loss_ce + (L_cons * training_cfg.alpha) - (low_L_cons * training_cfg.beta) + (loss_dice * training_cfg.gamma)
+            if robust_kd_enabled:
+                opt_degraded, dsm_degraded, _ = _degrade_input_batch(opt, dsm, robust_kd_cfg)
+                student_logits_deg, L_cons, low_L_cons = model(opt_degraded, dsm_degraded)
+                loss_ce = CrossEntropy2d(student_logits_deg, target, weight=weights)
+                loss_dice = dice_loss(student_logits_deg, target)
+                loss = loss_ce + (L_cons * training_cfg.alpha) - (low_L_cons * training_cfg.beta) + (
+                            loss_dice * training_cfg.gamma)
+
+                with torch.no_grad():
+                    if teacher_model is not None:
+                        teacher_logits_clean, _, _ = teacher_model(opt, dsm)
+                    else:
+                        teacher_logits_clean, _, _ = model(opt, dsm)
+                loss_kd = _kl_divergence_logits(student_logits_deg, teacher_logits_clean, temperature=kd_temperature)
+                loss = loss + kd_weight * loss_kd
+
+                if consistency_weight > 0:
+                    student_logits_clean, _, _ = model(opt, dsm)
+                    loss_consistency = _kl_divergence_logits(student_logits_deg, student_logits_clean.detach(),
+                                                             temperature=consistency_temperature)
+                    loss = loss + consistency_weight * loss_consistency
+            else:
+                output, L_cons, low_L_cons = model(opt, dsm)
+                loss_ce = CrossEntropy2d(output, target, weight=weights)
+                loss_dice = dice_loss(output, target)
+                loss = loss_ce + (L_cons * training_cfg.alpha) - (low_L_cons * training_cfg.beta) + (
+                            loss_dice * training_cfg.gamma)
             loss.backward()
             optimizer.step()
+            if robust_kd_enabled and teacher_model is not None and teacher_use_ema:
+                _update_ema_teacher(model, teacher_model, momentum=ema_momentum)
 
             if scheduler is not None:
                 scheduler.step()

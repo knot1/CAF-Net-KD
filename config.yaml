@@ -42,6 +42,19 @@ training:
   alpha: 0.01
   beta: 0.05
   gamma: 0.5
+  robust_kd:
+    enabled: true
+    teacher_checkpoint: ""
+    teacher_use_ema: true
+    ema_momentum: 0.999
+    kd_weight: 1.0
+    consistency_weight: 0.5
+    temperature: 1.0
+    consistency_temperature: 1.0
+    noise_std: 0.1
+    dsm_hole_ratio: 0.1
+    resolution_scale: 0.5
+    modes: [ "rgb_noise", "rgb_missing", "dsm_missing", "dsm_hole", "resolution_down" ]
 
 dataset:
   name: ${training_dataset}
