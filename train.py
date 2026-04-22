@@ -222,6 +222,17 @@ def train(dataset_cfg, training_cfg, model, optimizer, scheduler, train_loader, 
                 use_uaf_conf = bool(getattr(kd_cfg, "use_uaf_conf", False))
                 conf_threshold = float(getattr(kd_cfg, "conf_threshold", 0.0))
                 low_conf_weight = float(getattr(kd_cfg, "low_conf_weight", 0.0))
+                if use_uaf_conf:
+                    teacher_backbone = (
+                        teacher_model.module.backbone
+                        if hasattr(teacher_model, "module")
+                        else teacher_model.backbone
+                    )
+                    if not hasattr(teacher_backbone, "uaf4"):
+                        raise RuntimeError(
+                            "UAF confidence requested but teacher model has no UAF modules. "
+                            "Ensure the teacher architecture includes UAF and was loaded correctly."
+                        )
 
                 teacher_model.eval()
                 with torch.no_grad():
@@ -234,8 +245,8 @@ def train(dataset_cfg, training_cfg, model, optimizer, scheduler, train_loader, 
                 # pixel-wise logits KD
                 if use_uaf_conf and t_conf is None:
                     raise RuntimeError(
-                        "UAF confidence requested but teacher did not return a confidence map. "
-                        "Ensure the teacher model architecture includes UAF modules and was loaded correctly."
+                        "UAF confidence requested but teacher did not return a confidence map after forward pass. "
+                        "Verify the teacher implementation supports return_conf=True."
                     )
                 conf_weight = confidence_weight_map(
                     t_conf, threshold=conf_threshold, low_conf_weight=low_conf_weight, dtype=output.dtype
